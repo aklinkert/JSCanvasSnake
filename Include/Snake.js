@@ -15,14 +15,15 @@ $ ( document ).ready ( function ( ) {
 		colorSuperFood: "#FF0000" ,
 		weightSuperFood: 3 ,
 		weightFood: 1 ,
+		throughWalls: true ,
 		elements:
 			{
-			"startButton": $ ( "#start" ) ,
-			"pauseButton": $ ( "#pause" ) ,
-			"resetButton": $ ( "#reset" ) ,
-			"eatenFood": $ ( "#eatenFood" ) ,
-			"levelOutput": $ ( "#level" ) ,
-			"nextLevelOutput": $ ( "#nextLevel" )
+			length: $ ( "#length" ) ,
+			startButton: $ ( "#start" ) ,
+			pauseButton: $ ( "#pause" ) ,
+			resetButton: $ ( "#reset" ) ,
+			levelOutput: $ ( "#level" ) ,
+			nextLevelOutput: $ ( "#nextLevel" )
 			}
 		} );
 	s.init ( );
@@ -45,6 +46,7 @@ var Snake = function ( settings ) {
 	this.speed = settings.speed;
 	this.grid = settings.grid;
 	this.moveDirection = null;
+	this.throughWalls = null;
 	this.intervalObj = null;
 	this.foodCount = null;
 	this.nextLevel = 0;
@@ -126,10 +128,12 @@ var Snake = function ( settings ) {
 		this.moveDirection = this.settings.startDirection;
 		this.foodCount = this.settings.startFoodCount;
 		this.length = this.settings.startLength;
+		this.throughWalls = this.settings.wallsOption;
 		this.tail = new Array ( );
 		this.food = new Array ( );
 		this.intervalObj = null;
 		this.failed = false;
+		this.nextLevel = 0;
 		this.pause = true;
 		this.level = 0;
 		
@@ -173,20 +177,17 @@ var Snake = function ( settings ) {
 			this.length ++ ;
 			this.setLevel ( );
 			this.addFoods ( );
-		}
-		else if ( this.isTailDot ( this.pos ) ) {
+		} else if ( this.isTailDot ( this.pos ) ) {
 			this.failed = true;
 			this.elements.pauseButton.trigger ( "click" );
 			alert ( "Failed at Tail" );
 			return;
-		}
-		else if ( this.isBorderDot ( this.pos ) ) {
+		} else if ( this.isBorderDot ( this.pos ) ) {
 			this.failed = true;
 			this.elements.pauseButton.trigger ( "click" );
 			alert ( "Failed at Border" );
 			return;
-		}
-		else {
+		} else {
 			var lastDot = this.tail.shift ( );
 			this.removeDot ( lastDot );
 		}
@@ -264,12 +265,11 @@ var Snake = function ( settings ) {
 		while ( this.food.length < this.foodCount ) {
 			var rand = Math.random ( );
 			
-			if ( rand < 0.15 ) { // SuperFood
+			if ( rand < 0.25 ) { // SuperFood
 				var food = this.newFood ( this.weightSuperFood );
 				this.food.push ( food );
 				this.drawDot ( food.getPos ( ) , this.colorSuperFood );
-			}
-			else {
+			} else {
 				var food = this.newFood ( this.weightFood );
 				this.food.push ( food );
 				this.drawDot ( food.getPos ( ) , this.colorFood );
@@ -302,7 +302,7 @@ var Snake = function ( settings ) {
 	// OUTPUT OPERATIONS
 	
 	this.output = function ( ) {
-		this.elements.eatenFood.text ( this.length );
+		this.elements.length.text ( this.length );
 		this.elements.levelOutput.text ( this.level );
 		this.elements.nextLevelOutput.text ( this.nextLevel );
 	};
