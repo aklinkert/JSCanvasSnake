@@ -14,6 +14,7 @@ $ ( document ).ready ( function ( ) {
 		colorFood: "#FF0000" ,
 		colorSuperFood: "#0000FF" ,
 		weightSuperFood: 3 ,
+		percentageSuperFood: 0.15 ,
 		weightFood: 1 ,
 		throughWalls: true ,
 		elements:
@@ -37,8 +38,9 @@ var Snake = function ( settings ) {
 	this.settings = settings;
 	
 	this.graphic = settings.canvas.get ( 0 ).getContext ( "2d" );
+	this.percentageSuperFood = settings.percentageSuperFood;
 	this.weightSuperFood = settings.weightSuperFood;
-	this.c = settings.colorSuperFood;
+	this.colorSuperFood = settings.colorSuperFood;
 	this.maxHeight = settings.canvas.height ( );
 	this.maxWidth = settings.canvas.width ( );
 	this.colorSnake = settings.colorSnake;
@@ -47,7 +49,6 @@ var Snake = function ( settings ) {
 	this.levelStep = settings.levelStep;
 	this.elements = settings.elements;
 	this.changedDirection = null;
-	this.speed = settings.speed;
 	this.grid = settings.grid;
 	this.moveDirection = null;
 	this.intervalObj = null;
@@ -57,6 +58,7 @@ var Snake = function ( settings ) {
 	this.failed = null;
 	this.pause = null;
 	this.level = null;
+	this.speed = null;
 	this.tail = null;
 	this.food = null;
 	this.pos = null;
@@ -140,6 +142,7 @@ var Snake = function ( settings ) {
 		this.foodCount = this.settings.startFoodCount;
 		this.length = this.settings.startLength;
 		this.changedDirection = false;
+		this.speed = settings.speed;
 		this.tail = new Array ( );
 		this.food = new Array ( );
 		this.intervalObj = null;
@@ -180,16 +183,11 @@ var Snake = function ( settings ) {
 		this.changedDirection = false;
 		
 		if ( this.isFoodDot ( this.pos ) ) {
-			this.removeFood ( this.pos );
+			var food = this.removeFood ( this.pos );
 			this.removeDot ( this.pos );
-			this.length ++ ;
+			this.length += food.getWeight ( );
 			this.setLevel ( );
 			this.addFoods ( );
-		} else if ( this.isTailDot ( this.pos ) ) {
-			this.failed = true;
-			this.elements.pauseButton.trigger ( "click" );
-			alert ( "You failed!" );
-			return;
 		} else if ( this.isBorderDot ( this.pos ) ) {
 			if ( this.settings.elements.wallsOption.is ( ":checked" ) ) {
 				if ( this.pos.getx ( ) <= 0 ) {
@@ -209,8 +207,14 @@ var Snake = function ( settings ) {
 				alert ( "Failed at Border" );
 				return;
 			}
+		} else if ( this.isTailDot ( this.pos ) ) {
+			this.failed = true;
+			this.elements.pauseButton.trigger ( "click" );
+			alert ( "You failed!" );
+			return;
 		} else {
-			this.removeDot ( this.tail.shift ( ) );
+			if ( this.length <= this.tail.length )
+				this.removeDot ( this.tail.shift ( ) );
 		}
 		
 		this.tail.push ( this.cloneDot ( this.pos ) );
@@ -279,14 +283,14 @@ var Snake = function ( settings ) {
 		dot.setx ( dot.getx ( ) - ( ( dot.getx ( ) % this.grid ) - 1 ) );
 		dot.sety ( dot.gety ( ) - ( ( dot.gety ( ) % this.grid ) - 1 ) );
 		
-		return ( this.isValidDot ( dot , true ) ) ? new Food ( dot, weight ) : this.newFood ( );
+		return ( this.isValidDot ( dot , true ) ) ? new Food ( dot, weight ) : this.newFood ( weight );
 	};
 	
 	this.addFoods = function ( ) {
 		while ( this.food.length < this.foodCount ) {
 			var rand = Math.random ( );
 			
-			if ( rand < 0.25 ) { // SuperFood
+			if ( rand < this.percentageSuperFood ) { // SuperFood
 				var food = this.newFood ( this.weightSuperFood );
 				this.food.push ( food );
 				this.drawDot ( food.getPos ( ) , this.colorSuperFood );
@@ -303,9 +307,13 @@ var Snake = function ( settings ) {
 		if ( dot instanceof Food )
 			dot = dot.getPos ( );
 		
-		for ( var index in this.food )
-			if ( dot.getx ( ) == this.food [ index ].getPos ( ).getx ( ) && dot.gety ( ) == this.food [ index ].getPos ( ).gety ( ) )
-				return this.food.splice ( index , 1 );
+		for ( var index in this.food ) {
+			if ( dot.getx ( ) == this.food [ index ].getPos ( ).getx ( ) && dot.gety ( ) == this.food [ index ].getPos ( ).gety ( ) ) {
+				var food = this.food [ index ];
+				this.food.splice ( index , 1 );
+				return food;
+			}
+		}
 	};
 	
 	// LEVEL OPERATIONS
