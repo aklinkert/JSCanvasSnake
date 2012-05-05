@@ -11,8 +11,8 @@ $ ( document ).ready ( function ( ) {
 		levelStep: 1.5 ,
 		startLength: 5 ,
 		colorSnake: "#000000" ,
-		colorFood: "#00ff00" ,
-		colorSuperFood: "#FF0000" ,
+		colorFood: "#FF0000" ,
+		colorSuperFood: "#0000FF" ,
 		weightSuperFood: 3 ,
 		weightFood: 1 ,
 		throughWalls: true ,
@@ -23,7 +23,9 @@ $ ( document ).ready ( function ( ) {
 			pauseButton: $ ( "#pause" ) ,
 			resetButton: $ ( "#reset" ) ,
 			levelOutput: $ ( "#level" ) ,
-			nextLevelOutput: $ ( "#nextLevel" )
+			wallsOption: $ ( "#throughWalls" ) ,
+			nextLevelOutput: $ ( "#nextLevel" ) ,
+			increaseSpeedLevel: $ ( "#increaseSpeedLevel" )
 			}
 		} );
 	s.init ( );
@@ -36,6 +38,7 @@ var Snake = function ( settings ) {
 	
 	this.graphic = settings.canvas.get ( 0 ).getContext ( "2d" );
 	this.weightSuperFood = settings.weightSuperFood;
+	this.c = settings.colorSuperFood;
 	this.maxHeight = settings.canvas.height ( );
 	this.maxWidth = settings.canvas.width ( );
 	this.colorSnake = settings.colorSnake;
@@ -43,10 +46,10 @@ var Snake = function ( settings ) {
 	this.colorFood = settings.colorFood;
 	this.levelStep = settings.levelStep;
 	this.elements = settings.elements;
+	this.changedDirection = null;
 	this.speed = settings.speed;
 	this.grid = settings.grid;
 	this.moveDirection = null;
-	this.throughWalls = null;
 	this.intervalObj = null;
 	this.foodCount = null;
 	this.nextLevel = 0;
@@ -74,26 +77,34 @@ var Snake = function ( settings ) {
 			settings.startPosy = this.maxHeight - this.grid * 2;
 		
 		$ ( document ).on ( "keydown" , function ( event ) {
-			if ( thatSnake.pause )
+			if ( thatSnake.pause || thatSnake.changedDirection )
 				return;
 			
 			// left: 37, up: 38, right: 39, down 40
 			switch ( event.which ) {
 				case 37 :
-					if ( thatSnake.moveDirection != "left" && thatSnake.moveDirection != "right" )
+					if ( thatSnake.moveDirection != "left" && thatSnake.moveDirection != "right" ) {
 						thatSnake.moveDirection = "left";
+						thatSnake.changedDirection = true;
+					}
 					break;
 				case 38 :
-					if ( thatSnake.moveDirection != "up" && thatSnake.moveDirection != "down" )
+					if ( thatSnake.moveDirection != "up" && thatSnake.moveDirection != "down" ) {
 						thatSnake.moveDirection = "up";
+						thatSnake.changedDirection = true;
+					}
 					break;
 				case 39 :
-					if ( thatSnake.moveDirection != "left" && thatSnake.moveDirection != "right" )
+					if ( thatSnake.moveDirection != "left" && thatSnake.moveDirection != "right" ) {
 						thatSnake.moveDirection = "right";
+						thatSnake.changedDirection = true;
+					}
 					break;
 				case 40 :
-					if ( thatSnake.moveDirection != "up" && thatSnake.moveDirection != "down" )
+					if ( thatSnake.moveDirection != "up" && thatSnake.moveDirection != "down" ) {
 						thatSnake.moveDirection = "down";
+						thatSnake.changedDirection = true;
+					}
 					break;
 				default :
 
@@ -102,7 +113,7 @@ var Snake = function ( settings ) {
 		} );
 		
 		this.elements.startButton.on ( "click" , function ( ) {
-			if ( thatSnake.intervalObj == null ) {
+			if ( thatSnake.intervalObj == null && ! thatSnake.failed ) {
 				thatSnake.pause = false;
 				thatSnake.intervalObj = window.setInterval ( "thatSnake.move();" , 1000 / thatSnake.speed );
 			}
@@ -124,11 +135,11 @@ var Snake = function ( settings ) {
 	
 	this.start = function ( ) {
 		
-		this.pos = new Dot ( this.settings.startPosx, this.settings.startPosy, false );
+		this.pos = new Dot ( this.settings.startPosx, this.settings.startPosy );
 		this.moveDirection = this.settings.startDirection;
 		this.foodCount = this.settings.startFoodCount;
 		this.length = this.settings.startLength;
-		this.throughWalls = this.settings.wallsOption;
+		this.changedDirection = false;
 		this.tail = new Array ( );
 		this.food = new Array ( );
 		this.intervalObj = null;
@@ -159,17 +170,14 @@ var Snake = function ( settings ) {
 	};
 	
 	this.draw = function ( ) {
-		for ( var index in this.tail ) {
-			if ( this.tail [ index ].getDrawState ( ) )
-				continue;
-			
+		for ( var index in this.tail )
 			this.drawDot ( this.tail [ index ] , this.colorSnake );
-			this.tail [ index ].setDrawState ( true );
-		}
+		
 	};
 	
 	this.move = function ( ) {
 		this.pos = this.moveDot ( this.pos );
+		this.changedDirection = false;
 		
 		if ( this.isFoodDot ( this.pos ) ) {
 			this.removeFood ( this.pos );
@@ -180,20 +188,33 @@ var Snake = function ( settings ) {
 		} else if ( this.isTailDot ( this.pos ) ) {
 			this.failed = true;
 			this.elements.pauseButton.trigger ( "click" );
-			alert ( "Failed at Tail" );
+			alert ( "You failed!" );
 			return;
 		} else if ( this.isBorderDot ( this.pos ) ) {
-			this.failed = true;
-			this.elements.pauseButton.trigger ( "click" );
-			alert ( "Failed at Border" );
-			return;
+			if ( this.settings.elements.wallsOption.is ( ":checked" ) ) {
+				if ( this.pos.getx ( ) <= 0 ) {
+					this.pos.setx ( this.pos.getx ( ) + this.maxWidth );
+				} else if ( this.pos.getx ( ) >= this.maxWidth ) {
+					this.pos.setx ( this.pos.getx ( ) - this.maxWidth );
+				} else if ( this.pos.gety ( ) <= 0 ) {
+					this.pos.sety ( this.pos.gety ( ) + this.maxHeight );
+				} else if ( this.pos.gety ( ) >= this.maxHeight ) {
+					this.pos.sety ( this.pos.gety ( ) - this.maxHeight );
+				}
+				
+				this.removeDot ( this.tail.shift ( ) );
+			} else {
+				this.failed = true;
+				this.elements.pauseButton.trigger ( "click" );
+				alert ( "Failed at Border" );
+				return;
+			}
 		} else {
-			var lastDot = this.tail.shift ( );
-			this.removeDot ( lastDot );
+			this.removeDot ( this.tail.shift ( ) );
 		}
 		
 		this.tail.push ( this.cloneDot ( this.pos ) );
-		this.drawDot ( this.pos );
+		this.drawDot ( this.pos , this.colorSnake );
 	};
 	
 	// DOT OPERATIONS
@@ -205,7 +226,7 @@ var Snake = function ( settings ) {
 	};
 	
 	this.cloneDot = function ( dot ) {
-		return new Dot ( dot.getx ( ), dot.gety ( ), dot.getDrawState ( ) );
+		return new Dot ( dot.getx ( ), dot.gety ( ) );
 	};
 	
 	this.removeDot = function ( dot ) {
@@ -254,7 +275,7 @@ var Snake = function ( settings ) {
 	// FOOD OPERATIONS
 	
 	this.newFood = function ( weight ) {
-		var dot = new Dot ( Math.round ( Math.random ( ) * this.maxWidth ), Math.round ( Math.random ( ) * this.maxHeight , false ) );
+		var dot = new Dot ( Math.round ( Math.random ( ) * this.maxWidth ), Math.round ( Math.random ( ) * this.maxHeight ) );
 		dot.setx ( dot.getx ( ) - ( ( dot.getx ( ) % this.grid ) - 1 ) );
 		dot.sety ( dot.gety ( ) - ( ( dot.gety ( ) % this.grid ) - 1 ) );
 		
@@ -294,6 +315,14 @@ var Snake = function ( settings ) {
 			this.level ++ ;
 			this.nextLevel = this.level + Math.round ( this.length * this.levelStep );
 			this.foodCount = Math.round ( this.level / 2 );
+			
+			if ( this.settings.elements.increaseSpeedLevel.is ( ":checked" ) ) {
+				this.speed *= 1.2;
+				if ( ! this.pause ) {
+					this.elements.pauseButton.trigger ( "click" );
+					this.elements.startButton.trigger ( "click" );
+				}
+			}
 		}
 		
 		this.output ( );
@@ -321,8 +350,7 @@ var Food = function ( pos , weight ) {
 	};
 };
 
-var Dot = function ( x , y , drawState ) {
-	this.drawState = drawState || false;
+var Dot = function ( x , y ) {
 	this.x = x;
 	this.y = y;
 	
@@ -340,13 +368,5 @@ var Dot = function ( x , y , drawState ) {
 	
 	this.sety = function ( y ) {
 		this.y = y;
-	};
-	
-	this.getDrawState = function ( ) {
-		return this.state;
-	};
-	
-	this.setDrawState = function ( drawState ) {
-		this.drawState = drawState;
 	};
 };
