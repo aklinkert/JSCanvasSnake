@@ -7,15 +7,36 @@ $ ( document ).ready ( function ( ) {
 		startDirection: "right" ,
 		speed: 15 ,
 		grid: 10 ,
-		startFoodCount: 1 ,
 		levelStep: 1.5 ,
 		startLength: 5 ,
 		colorSnake: "#000000" ,
-		colorFood: "#FF0000" ,
-		colorSuperFood: "#0000FF" ,
-		weightSuperFood: 3 ,
-		percentageSuperFood: 0.15 ,
-		weightFood: 1 ,
+		food:
+			{
+			"default":
+				{
+				"color": "#888888" ,
+				"weight": 1 ,
+				"default": true
+				} ,
+			"bigfood":
+				{
+				"color": "#0000FF" ,
+				"weight": 3 ,
+				"percentage": 10
+				} ,
+			"slowMotionFood":
+				{
+				"color": "#00FF00" ,
+				"weight": 0 ,
+				"percentage": 5
+				} ,
+			"speedFood":
+				{
+				"color": "#FF0000" ,
+				"weight": 0 ,
+				"percentage": 5
+				}
+			} ,
 		throughWalls: true ,
 		elements:
 			{
@@ -38,19 +59,15 @@ var Snake = function ( settings ) {
 	this.settings = settings;
 	
 	this.graphic = settings.canvas.get ( 0 ).getContext ( "2d" );
-	this.percentageSuperFood = settings.percentageSuperFood;
-	this.weightSuperFood = settings.weightSuperFood;
-	this.colorSuperFood = settings.colorSuperFood;
 	this.maxHeight = settings.canvas.height ( );
 	this.maxWidth = settings.canvas.width ( );
 	this.colorSnake = settings.colorSnake;
-	this.weightFood = settings.weightFood;
-	this.colorFood = settings.colorFood;
 	this.levelStep = settings.levelStep;
 	this.elements = settings.elements;
 	this.changedDirection = null;
 	this.grid = settings.grid;
 	this.moveDirection = null;
+	this.foodTypes = settings.food;
 	this.intervalObj = null;
 	this.foodCount = null;
 	this.nextLevel = 0;
@@ -66,17 +83,17 @@ var Snake = function ( settings ) {
 	this.init = function ( ) {
 		thatSnake = this;
 		
-		settings.startPosx -= ( ( settings.startPosx % this.grid ) - 1 );
-		if ( settings.startPosx < this.grid )
-			settings.startPosx = this.grid * 2;
-		if ( settings.startPosx > this.maxWidth - this.grid )
-			settings.startPosx = this.maxWidth - this.grid * 2;
+		this.settings.startPosx -= ( ( this.settings.startPosx % this.grid ) - 1 );
+		if ( this.settings.startPosx < this.grid )
+			this.settings.startPosx = this.grid * 2;
+		if ( this.settings.startPosx > this.maxWidth - this.grid )
+			this.settings.startPosx = this.maxWidth - this.grid * 2;
 		
-		settings.startPosy -= ( ( settings.startPosy % this.grid ) - 1 );
-		if ( settings.startPosy < this.grid )
-			settings.startPosy = this.grid * 2;
-		if ( settings.startPosy > this.maxHeight - this.grid )
-			settings.startPosy = this.maxHeight - this.grid * 2;
+		this.settings.startPosy -= ( ( this.settings.startPosy % this.grid ) - 1 );
+		if ( this.settings.startPosy < this.grid )
+			this.settings.startPosy = this.grid * 2;
+		if ( this.settings.startPosy > this.maxHeight - this.grid )
+			this.settings.startPosy = this.maxHeight - this.grid * 2;
 		
 		$ ( document ).on ( "keydown" , function ( event ) {
 			if ( thatSnake.pause || thatSnake.changedDirection )
@@ -114,32 +131,39 @@ var Snake = function ( settings ) {
 			}
 		} );
 		
-		this.elements.startButton.on ( "click" , function ( ) {
+		$ ( this.elements.startButton ).on ( "click" , function ( ) {
 			if ( thatSnake.intervalObj == null && ! thatSnake.failed ) {
 				thatSnake.pause = false;
 				thatSnake.intervalObj = window.setInterval ( "thatSnake.move();" , 1000 / thatSnake.speed );
 			}
 		} );
 		
-		this.elements.resetButton.on ( "click" , function ( ) {
+		$ ( this.elements.resetButton ).on ( "click" , function ( ) {
 			if ( thatSnake.intervalObj == null && thatSnake.failed )
 				thatSnake.start ( );
 		} );
 		
-		this.elements.pauseButton.on ( "click" , function ( ) {
+		$ ( this.elements.pauseButton ).on ( "click" , function ( ) {
 			if ( thatSnake.intervalObj != null ) {
 				window.clearInterval ( thatSnake.intervalObj );
 				thatSnake.intervalObj = null;
 			}
 			
 		} );
+		
+		var percent = 0;
+		for ( var index in this.foodTypes )
+			if ( typeof this.foodTypes [ index ].percentage != "undefined" )
+				this.foodTypes [ index ].percentage = percent = this.foodTypes [ index ].percentage + percent;
+		
+		if ( typeof this.foodTypes [ "default" ] == "undefined" )
+			this.foodTypes [ "default" ] = this.foodTypes [ 0 ];
 	};
 	
 	this.start = function ( ) {
 		
 		this.pos = new Dot ( this.settings.startPosx, this.settings.startPosy );
 		this.moveDirection = this.settings.startDirection;
-		this.foodCount = this.settings.startFoodCount;
 		this.length = this.settings.startLength;
 		this.changedDirection = false;
 		this.speed = settings.speed;
@@ -148,8 +172,11 @@ var Snake = function ( settings ) {
 		this.intervalObj = null;
 		this.failed = false;
 		this.nextLevel = 0;
+		this.foodCount = 0;
 		this.pause = true;
 		this.level = 0;
+		
+		this.setLevel ( );
 		
 		this.graphic.clearRect ( 0 , 0 , this.maxWidth , this.maxHeight );
 		
@@ -168,14 +195,11 @@ var Snake = function ( settings ) {
 		
 		// Draw Snake
 		this.draw ( );
-		
-		this.setLevel ( );
 	};
 	
 	this.draw = function ( ) {
 		for ( var index in this.tail )
 			this.drawDot ( this.tail [ index ] , this.colorSnake );
-		
 	};
 	
 	this.move = function ( ) {
@@ -203,13 +227,13 @@ var Snake = function ( settings ) {
 				this.removeDot ( this.tail.shift ( ) );
 			} else {
 				this.failed = true;
-				this.elements.pauseButton.trigger ( "click" );
+				$ ( this.elements.pauseButton ).trigger ( "click" );
 				alert ( "Failed at Border" );
 				return;
 			}
 		} else if ( this.isTailDot ( this.pos ) ) {
 			this.failed = true;
-			this.elements.pauseButton.trigger ( "click" );
+			$ ( this.elements.pauseButton ).trigger ( "click" );
 			alert ( "You failed!" );
 			return;
 		} else {
@@ -288,18 +312,35 @@ var Snake = function ( settings ) {
 	
 	this.addFoods = function ( ) {
 		while ( this.food.length < this.foodCount ) {
-			var rand = Math.random ( );
-			
-			if ( rand < this.percentageSuperFood ) { // SuperFood
-				var food = this.newFood ( this.weightSuperFood );
-				this.food.push ( food );
-				this.drawDot ( food.getPos ( ) , this.colorSuperFood );
-			} else {
-				var food = this.newFood ( this.weightFood );
-				this.food.push ( food );
-				this.drawDot ( food.getPos ( ) , this.colorFood );
+			var rand = ( Math.random ( ) ) * 100;
+			var f = null;
+			for ( var index in this.foodTypes ) {
+				f = this.foodTypes [ index ];
+				
+				if ( ( typeof f.percentage != "undefined" ) && ( rand <= f.percentage ) ) {
+					console.debug ( "rand: " + rand + "; food: " + index + "; percentage: " + f.percentage + "; weight: " + f.weight );
+					var food = this.newFood ( f.weight );
+					this.food.push ( food );
+					this.drawDot ( food.getPos ( ) , f.color );
+					
+					if ( typeof f.effekt != "undefined" ) {
+						// TODO implement effekts
+					}
+					
+					break;
+				}
+				
+				f = null;
 			}
 			
+			if ( f == null ) {
+				f = this.foodTypes [ "default" ];
+				console.debug ( "rand: " + rand + "; food: default; weight: " + f.weight );
+				var food = this.newFood ( f.weight );
+				this.food.push ( food );
+				this.drawDot ( food.getPos ( ) , f.color );
+				break;
+			}
 		}
 	};
 	
@@ -327,8 +368,8 @@ var Snake = function ( settings ) {
 			if ( this.settings.elements.increaseSpeedLevel.is ( ":checked" ) ) {
 				this.speed *= 1.2;
 				if ( ! this.pause ) {
-					this.elements.pauseButton.trigger ( "click" );
-					this.elements.startButton.trigger ( "click" );
+					$ ( this.elements.pauseButton ).trigger ( "click" );
+					$ ( this.elements.startButton ).trigger ( "click" );
 				}
 			}
 		}
@@ -339,9 +380,9 @@ var Snake = function ( settings ) {
 	// OUTPUT OPERATIONS
 	
 	this.output = function ( ) {
-		this.elements.length.text ( this.length );
-		this.elements.levelOutput.text ( this.level );
-		this.elements.nextLevelOutput.text ( this.nextLevel );
+		$ ( this.elements.length ).text ( this.length );
+		$ ( this.elements.levelOutput ).text ( this.level );
+		$ ( this.elements.nextLevelOutput ).text ( this.nextLevel );
 	};
 };
 
